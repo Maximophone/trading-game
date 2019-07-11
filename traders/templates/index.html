@@ -1,0 +1,11 @@
+<html>
+    <head>
+        <title>Traders</title>
+    </head>
+    <body>
+        <h1>Markets</h1>
+        {% for market in markets %}
+            <ul><a href="/market/{{market['id']}}">{{market['id']}}</a></ul>
+        {% endfor %}
+    </body>
+</html>
