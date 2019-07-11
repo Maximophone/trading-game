@@ -4,9 +4,12 @@ from traders.market import markets
 
 import pytest
 
+@pytest.fixture(autouse=True)
+def clear_users():
+    USERS.clear()
+
 @pytest.fixture
 def client():
-    USERS.clear()
     app.config["TESTING"] = True
     client = app.test_client()
     yield client
