@@ -69,15 +69,11 @@ class Market(Thread):
         assert token in self.token_id
         return self.token_id[token]
 
-    def join_market(self, user_ip: str, user_id: str) -> Tuple[str, int]:
-        assert user_ip not in self.ip_tokens
+    def join_market(self, user_id: str) -> int:
         assert user_id not in self.participants
-        token = self.gen_token()
-        self.ip_tokens[user_ip] = token
-        self.token_id[token] = user_id
         hidden_value: int = self.pick_new_value()
         self.participants[user_id] = Participant(user_id, hidden_value, Portfolio())
-        return token, hidden_value
+        return hidden_value
 
     def post_order(self, user_id: str, side: bool, quantity: int, price: float):
         assert user_id in self.participants
@@ -121,9 +117,9 @@ class Market(Thread):
 
 market_test = Market()
 markets: Dict[str, Market] = {"Market1": market_test}
-market_test.join_market("1", "max")
-market_test.join_market("2", "bob")
-market_test.join_market("3", "john")
+market_test.join_market("max")
+market_test.join_market("bob")
+market_test.join_market("john")
 market_test.post_order("max", True, 100, 10)
 market_test.post_order("bob", False, 100, 20)
 market_test.post_order("max", False, 50, 10)

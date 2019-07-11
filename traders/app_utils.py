@@ -1,4 +1,4 @@
-from flask import request, jsonify
+from flask import session, request, jsonify
 from traders.market import markets
 
 
@@ -55,11 +55,17 @@ def check_market(f):
 def check_participant(f):
     def inner(market_id, *args, **kwargs):
         market = markets.get(market_id)
-        token = request.form.get("token")
-        if token is None:
-            return jsonify(error(f"User needs to pass authentication token"))
-        if token not in market.token_id:
-            return jsonify(error(f"Invalid token. Has user joined this market?"))
+        user_id = session["user_id"]
+        if user_id not in market.participants:
+            return jsonify(error(f"User needs to join market first"))
         return f(market_id, *args, **kwargs)
+    inner.__name__ = f.__name__
+    return inner
+
+def check_logged_in(f):
+    def inner(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify(error("User needs to be logged in to access this service"))
+        return f(*args, **kwargs)
     inner.__name__ = f.__name__
     return inner

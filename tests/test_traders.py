@@ -1,14 +1,15 @@
 from traders import __version__
-from traders.app import app
+from traders.app import app, USERS
 from traders.market import markets
 
 import pytest
 
 @pytest.fixture
 def client():
+    USERS.clear()
     app.config["TESTING"] = True
     client = app.test_client()
-    return client
+    yield client
 
 @pytest.fixture(scope='session', autouse=True)
 def stop_markets():
@@ -58,19 +59,35 @@ def test_new_market(client):
     assert rv.status_code == 200
     assert rv.get_json() == [initial_market, {"id": "2", "is_open": True}]
 
+def test_login(client):
+    resp = get_200(client, "/login")
+    assert resp == {"logged_in": False}
+
+    resp = post_200(client, "/login", data={"name": "max"})
+    assert resp == {"status": "login succesful"}
+
+    resp = get_200(client, "/login")
+    assert resp == {"logged_in": True, "name": "max"}
+
 def test_scenario(client):
     post_200(client, "/markets/new", data=dict(name="2"))
-    join_resp = post_200(client, "/market/2/join", data={"name":"max"})
+    
+    # Max logs in
+    login_resp = post_200(client, "/login", data={"name": "max"})
+    assert login_resp == {"status": "login succesful"}
+
+    # Max joins market 2
+    join_resp = post_200(client, "/market/2/join")
     assert "market_values" in join_resp
     assert "hidden_value" in join_resp
-    assert "token" in join_resp
-    token = join_resp["token"]
 
-    portfolio_resp = get_200(client, "/market/2/portfolio", data={"token":token})
+    # Max checks his portfolio
+    portfolio_resp = get_200(client, "/market/2/portfolio")
     assert portfolio_resp == {"assets": 0, "capital": 0}
 
-    post_200(client, "/market/2/order/post/buy", data=dict(quantity=100, price=10, token=token))
-    book_resp = get_200(client, "/market/2/books", data=dict(token=token))
+    # Max posts buy order
+    post_200(client, "/market/2/order/post/buy", data=dict(quantity=100, price=10))
+    book_resp = get_200(client, "/market/2/books")
 
     expected_book = {
         "buy": {
@@ -82,14 +99,14 @@ def test_scenario(client):
     }
     assert book_resp == expected_book
 
-    take_resp = post_200(client, "/market/2/order/take/sell", data=dict(quantity=50, price=10, token=token))
+    take_resp = post_200(client, "/market/2/order/take/sell", data=dict(quantity=50, price=10))
     assert take_resp == {"filled": 0}
 
-    take_resp = post_200(client, "/market/2/order/take/buy", data=dict(quantity=40, price=10., token=token))
+    take_resp = post_200(client, "/market/2/order/take/buy", data=dict(quantity=40, price=10.))
     assert take_resp == {"filled": 40}
 
     # taking his own order
-    book_resp = get_200(client, "/market/2/books", data=dict(token=token))
+    book_resp = get_200(client, "/market/2/books")
     expected_book = {
         "buy": {
             "10.0": [
@@ -101,17 +118,21 @@ def test_scenario(client):
     assert book_resp == expected_book
 
     # Checking porfolio
-    portfolio = get_200(client, "/market/2/portfolio", data=dict(token=token))
+    portfolio = get_200(client, "/market/2/portfolio")
     assert portfolio == {"assets": 0, "capital": 0.}
 
-    # New participant joins
-    join_resp_bob = post_200(client, "/market/2/join", data={"name": "bob"}, ip="bob")
-    token_bob = join_resp_bob["token"]
+    # Bob logs in
+    client_bob = app.test_client()
+    login_resp = post_200(client_bob, "/login", data={"name": "bob"})
+    assert login_resp == {"status": "login succesful"}
 
-    take_resp = post_200(client, "/market/2/order/take/buy", data=dict(quantity=100, price=10., token=token_bob))
+    # Bob joins market
+    post_200(client_bob, "/market/2/join")
+
+    take_resp = post_200(client_bob, "/market/2/order/take/buy", data=dict(quantity=100, price=10.))
     assert take_resp == {"filled": 60}
 
-    book_resp = get_200(client, "/market/2/books", data=dict(token=token_bob))
+    book_resp = get_200(client_bob, "/market/2/books")
     expected_book = {
         "buy": {
             "10.0": [
@@ -123,8 +144,8 @@ def test_scenario(client):
     assert book_resp == expected_book
 
     # Checking porfolios
-    portfolio_max = get_200(client, "/market/2/portfolio", data=dict(token=token))
+    portfolio_max = get_200(client, "/market/2/portfolio")
     assert portfolio_max == {"assets": 60, "capital": -600.}
     
-    portfolio_bob = get_200(client, "/market/2/portfolio", data=dict(token=token_bob))
+    portfolio_bob = get_200(client_bob, "/market/2/portfolio")
     assert portfolio_bob == {"assets": -60, "capital": 600.}

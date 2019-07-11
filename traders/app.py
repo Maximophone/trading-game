@@ -1,10 +1,14 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, session, request, Response, jsonify, render_template
 from dataclasses import asdict
 
 from traders.market import Market, Sides, markets
-from traders.app_utils import error, check_market, check_participant, check_form_values
+from traders.app_utils import error, check_market, check_participant, check_form_values, check_logged_in
 
 app = Flask(__name__, static_url_path="/static/")
+
+app.secret_key = b"dummy_key"
+
+USERS = set()
 
 def get_markets_list():
     return [{
@@ -20,6 +24,29 @@ def ping():
 @app.route("/")
 def index():
     return render_template("index.html",  markets=get_markets_list())
+
+@app.route("/login", methods=["POST"])
+@check_form_values(name=str)
+def login():
+    if "user_id" in session:
+        return jsonify(error("Already logged in with username " + session["user_id"]))
+    if request.form["name"] in USERS:
+        return jsonify(error("Username is already taken, please choose an other one"))
+    session["user_id"] = request.form["name"]
+    USERS.add(request.form["name"])
+    return jsonify({"status": "login succesful"})
+
+@app.route("/login", methods=["GET"])
+def get_login():
+    if "user_id" in session:
+        return jsonify({
+            "logged_in": True,
+            "name": session["user_id"]
+        })
+    else:
+        return jsonify({
+            "logged_in": False
+        })
 
 @app.route("/markets/new", methods=["POST"])
 @check_form_values(name=str)
@@ -42,18 +69,15 @@ def market_index(market_id):
     return render_template("market.html", market_id=market_id)
 
 @app.route("/market/<market_id>/join", methods=["POST"])
-@check_form_values(name=str)
 @check_market
+@check_logged_in
 def join_market(market_id):
-    user_ip = request.remote_addr
+    user_id = session["user_id"]
     market = markets.get(market_id)
-    if user_ip in market.ip_tokens:
+    if user_id in market.participants:
         return jsonify(error(f"User already in market, can only join once"))
-    if request.form["name"] in market.participants:
-        return jsonify(error(f"Username is already taken, select a new one"))
-    token, hidden_value = market.join_market(user_ip, request.form.get("name"))
+    hidden_value = market.join_market(user_id)
     return jsonify({
-        "token": token,
         "market_values": market.values,
         "hidden_value": hidden_value
     })
@@ -72,31 +96,34 @@ def get_books(market_id):
 
 @app.route("/market/<market_id>/order/post/buy", methods=["POST"])
 @check_market
+@check_logged_in
 @check_participant
 @check_form_values(quantity=int, price=float)
 def post_order_buy(market_id):
     market = markets.get(market_id)
-    user_id = market.get_id(request.form["token"])
+    user_id = session["user_id"]
     market.post_order(user_id, Sides.BUY, request.form["quantity"], request.form["price"])
     return jsonify({})
 
 @app.route("/market/<market_id>/order/post/sell", methods=["POST"])
 @check_market
+@check_logged_in
 @check_participant
 @check_form_values(quantity=int, price=float)
 def post_order_sell(market_id):
     market = markets.get(market_id)
-    user_id = market.get_id(request.form["token"])
+    user_id = session["user_id"]
     market.post_order(user_id, Sides.SELL, request.form["quantity"], request.form["price"])
     return jsonify({})
 
 @app.route("/market/<market_id>/order/take/buy", methods=["POST"])
 @check_market
+@check_logged_in
 @check_participant
 @check_form_values(quantity=int, price=float)
 def take_order_buy(market_id):
     market = markets.get(market_id)
-    user_id = market.get_id(request.form["token"])
+    user_id = session["user_id"]
     side, quantity, price = Sides.BUY, request.form["quantity"], request.form["price"]
     filled = market.take_order(user_id, side, quantity, price)
     return jsonify({
@@ -105,11 +132,12 @@ def take_order_buy(market_id):
 
 @app.route("/market/<market_id>/order/take/sell", methods=["POST"])
 @check_market
+@check_logged_in
 @check_participant
 @check_form_values(quantity=int, price=float)
 def take_order_sell(market_id):
     market = markets.get(market_id)
-    user_id = market.get_id(request.form["token"])
+    user_id = session["user_id"]
     side, quantity, price = Sides.SELL, request.form["quantity"], request.form["price"]
     filled = market.take_order(user_id, side, quantity, price)
     return jsonify({
@@ -118,10 +146,11 @@ def take_order_sell(market_id):
 
 @app.route("/market/<market_id>/portfolio", methods=["GET"])
 @check_market
+@check_logged_in
 @check_participant
 def get_portfolio(market_id):
     market = markets.get(market_id)
-    user_id = market.get_id(request.form["token"])
+    user_id = session["user_id"]
     portfolio = market.participants[user_id].portfolio
     return jsonify({
         "capital": portfolio.capital,
