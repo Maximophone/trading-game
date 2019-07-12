@@ -7,12 +7,12 @@ def error(message: str):
         "error": message
     }
 
-def check_form_values(**form_values):
+def check_json_values(**form_values):
     def wrapper(f):
         def inner(*args, **kwargs):
-            checked_form = dict(request.form)
+            checked_form = dict(request.json)
             for arg, typ in form_values.items():
-                arg_value = request.form.get(arg)
+                arg_value = request.json.get(arg)
                 if arg_value is None:
                     return jsonify(error(f"Parameter {arg} must be passed"))
                 try:
@@ -21,7 +21,7 @@ def check_form_values(**form_values):
                     return jsonify(error(f"Parameter {arg} type should be {typ} but got {type(arg_value)}"))
 
 
-            request.form = checked_form
+            request.getJson = lambda: checked_form
             return f(*args, **kwargs)
         inner.__name__ = f.__name__
         return inner

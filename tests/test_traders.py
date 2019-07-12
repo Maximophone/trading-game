@@ -55,7 +55,7 @@ def test_get_markets(client):
     assert rv.get_json() == [initial_market]
 
 def test_new_market(client):
-    rv = client.post("/markets/new", data=dict(name="2"))
+    rv = client.post("/markets/new", json=dict(name="2"))
     assert rv.status_code == 200
     assert rv.get_json() == {"market_id": "2"}
     rv = client.get("/markets")
@@ -66,17 +66,17 @@ def test_login(client):
     resp = get_200(client, "/login")
     assert resp == {"logged_in": False}
 
-    resp = post_200(client, "/login", data={"name": "max"})
+    resp = post_200(client, "/login", json={"name": "max"})
     assert resp == {"status": "login succesful"}
 
     resp = get_200(client, "/login")
     assert resp == {"logged_in": True, "name": "max"}
 
 def test_scenario(client):
-    post_200(client, "/markets/new", data=dict(name="2"))
+    post_200(client, "/markets/new", json=dict(name="2"))
     
     # Max logs in
-    login_resp = post_200(client, "/login", data={"name": "max"})
+    login_resp = post_200(client, "/login", json={"name": "max"})
     assert login_resp == {"status": "login succesful"}
 
     # Max joins market 2
@@ -89,31 +89,31 @@ def test_scenario(client):
     assert portfolio_resp == {"assets": 0, "capital": 0}
 
     # Max posts buy order
-    post_200(client, "/market/2/order/post/buy", data=dict(quantity=100, price=10))
+    post_200(client, "/market/2/order/post/buy", json=dict(quantity=100, price=10))
     book_resp = get_200(client, "/market/2/books")
 
     expected_book = {
         "buy": {
-            "10.0": [
-                {"filled": 0, "participant_id": "max", "price": 10., "quantity": 100, "side": True}
+            "10": [
+                {"filled": 0, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
             ]
         }, 
         "sell": {}
     }
     assert book_resp == expected_book
 
-    take_resp = post_200(client, "/market/2/order/take/sell", data=dict(quantity=50, price=10))
+    take_resp = post_200(client, "/market/2/order/take/sell", json=dict(quantity=50, price=10))
     assert take_resp == {"filled": 0}
 
-    take_resp = post_200(client, "/market/2/order/take/buy", data=dict(quantity=40, price=10.))
+    take_resp = post_200(client, "/market/2/order/take/buy", json=dict(quantity=40, price=10.))
     assert take_resp == {"filled": 40}
 
     # taking his own order
     book_resp = get_200(client, "/market/2/books")
     expected_book = {
         "buy": {
-            "10.0": [
-                {"filled": 40, "participant_id": "max", "price": 10., "quantity": 100, "side": True}
+            "10": [
+                {"filled": 40, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
             ]
         },
         "sell": {}
@@ -126,20 +126,20 @@ def test_scenario(client):
 
     # Bob logs in
     client_bob = app.test_client()
-    login_resp = post_200(client_bob, "/login", data={"name": "bob"})
+    login_resp = post_200(client_bob, "/login", json={"name": "bob"})
     assert login_resp == {"status": "login succesful"}
 
     # Bob joins market
     post_200(client_bob, "/market/2/join")
 
-    take_resp = post_200(client_bob, "/market/2/order/take/buy", data=dict(quantity=100, price=10.))
+    take_resp = post_200(client_bob, "/market/2/order/take/buy", json=dict(quantity=100, price=10.))
     assert take_resp == {"filled": 60}
 
     book_resp = get_200(client_bob, "/market/2/books")
     expected_book = {
         "buy": {
-            "10.0": [
-                {"filled": 100, "participant_id": "max", "price": 10., "quantity": 100, "side": True}
+            "10": [
+                {"filled": 100, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
             ]
         },
         "sell": {}

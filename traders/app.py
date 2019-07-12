@@ -3,7 +3,7 @@ from flask_cors import CORS, cross_origin
 from dataclasses import asdict
 
 from traders.market import Market, Sides, markets
-from traders.app_utils import error, check_market, check_participant, check_form_values, check_logged_in
+from traders.app_utils import error, check_market, check_participant, check_json_values, check_logged_in
 
 app = Flask(__name__, static_url_path="/static/")
 cors = CORS(app)
@@ -30,14 +30,14 @@ def index():
 
 @app.route("/login", methods=["POST"])
 @cross_origin()
-@check_form_values(name=str)
+@check_json_values(name=str)
 def login():
     if "user_id" in session:
         return jsonify(error("Already logged in with username " + session["user_id"]))
-    if request.form["name"] in USERS:
+    if request.json["name"] in USERS:
         return jsonify(error("Username is already taken, please choose an other one"))
-    session["user_id"] = request.form["name"]
-    USERS.add(request.form["name"])
+    session["user_id"] = request.json["name"]
+    USERS.add(request.json["name"])
     return jsonify({"status": "login succesful"})
 
 @app.route("/login", methods=["GET"])
@@ -53,9 +53,9 @@ def get_login():
         })
 
 @app.route("/markets/new", methods=["POST"])
-@check_form_values(name=str)
+@check_json_values(name=str)
 def new_market():
-    name = request.form["name"]
+    name = request.json["name"]
     if not name.isalnum():
         return jsonify(error("Market name must be alphanumeric without space"))
     if name in markets:
@@ -102,33 +102,33 @@ def get_books(market_id):
 @check_market
 @check_logged_in
 @check_participant
-@check_form_values(quantity=int, price=float)
+@check_json_values(quantity=int, price=float)
 def post_order_buy(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    market.post_order(user_id, Sides.BUY, request.form["quantity"], request.form["price"])
+    market.post_order(user_id, Sides.BUY, request.json["quantity"], request.json["price"])
     return jsonify({})
 
 @app.route("/market/<market_id>/order/post/sell", methods=["POST"])
 @check_market
 @check_logged_in
 @check_participant
-@check_form_values(quantity=int, price=float)
+@check_json_values(quantity=int, price=float)
 def post_order_sell(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    market.post_order(user_id, Sides.SELL, request.form["quantity"], request.form["price"])
+    market.post_order(user_id, Sides.SELL, request.json["quantity"], request.json["price"])
     return jsonify({})
 
 @app.route("/market/<market_id>/order/take/buy", methods=["POST"])
 @check_market
 @check_logged_in
 @check_participant
-@check_form_values(quantity=int, price=float)
+@check_json_values(quantity=int, price=float)
 def take_order_buy(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    side, quantity, price = Sides.BUY, request.form["quantity"], request.form["price"]
+    side, quantity, price = Sides.BUY, request.json["quantity"], request.json["price"]
     filled = market.take_order(user_id, side, quantity, price)
     return jsonify({
         "filled": filled
@@ -138,11 +138,11 @@ def take_order_buy(market_id):
 @check_market
 @check_logged_in
 @check_participant
-@check_form_values(quantity=int, price=float)
+@check_json_values(quantity=int, price=float)
 def take_order_sell(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    side, quantity, price = Sides.SELL, request.form["quantity"], request.form["price"]
+    side, quantity, price = Sides.SELL, request.json["quantity"], request.json["price"]
     filled = market.take_order(user_id, side, quantity, price)
     return jsonify({
         "filled": filled
