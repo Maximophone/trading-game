@@ -20,8 +20,8 @@ class App extends Component {
 
   render() {
     const child_props = {
-      is_logged_in: this,
-      user_has_authenticated: this.user_has_authenticated
+      is_logged_in: this.state.is_logged_in,
+      user_has_logged_in: this.user_has_logged_in
     }
     return (
       <div className="App container">

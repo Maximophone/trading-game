@@ -43,7 +43,6 @@ def check_params(*param_types):
         return inner
     return wrapper
 
-
 def check_market(f):
     def inner(market_id, *args, **kwargs):
         if market_id not in markets:

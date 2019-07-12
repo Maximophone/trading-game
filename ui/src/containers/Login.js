@@ -35,7 +35,7 @@ export default class Login extends Component {
     }).then((response) => response.json())
     .then((data) => {
         if(data.status === "login succesful"){
-            this.props.userHasLoggedIn(true);
+            this.props.user_has_logged_in(true);
         } else {
             alert(data.error);
         }
