@@ -1,10 +1,13 @@
 from flask import Flask, session, request, Response, jsonify, render_template
+from flask_cors import CORS, cross_origin
 from dataclasses import asdict
 
 from traders.market import Market, Sides, markets
 from traders.app_utils import error, check_market, check_participant, check_form_values, check_logged_in
 
 app = Flask(__name__, static_url_path="/static/")
+cors = CORS(app)
+app.config["CORS_HEADERS"] = "Content-Type"
 
 app.secret_key = b"dummy_key"
 
@@ -26,6 +29,7 @@ def index():
     return render_template("index.html",  markets=get_markets_list())
 
 @app.route("/login", methods=["POST"])
+@cross_origin()
 @check_form_values(name=str)
 def login():
     if "user_id" in session:
