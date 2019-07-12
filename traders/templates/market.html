@@ -4,10 +4,9 @@
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
     </head>
     <body>
-        <h2>Buy Orders</h2>
-        <ul id="buy"></ul>
-        <h2>Sell Orders</h2>
-        <ul id="sell"></ul>
+        <script src="https://unpkg.com/react@16/umd/react.development.js" crossorigin></script>
+        <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js" crossorigin></script>
+        <div id="root"></div>
         <script type="text/javascript">market_id = "{{market_id}}";</script>
         <script type="text/javascript" src="{{ url_for('static', filename='market.js')}}"></script>
     </body>
