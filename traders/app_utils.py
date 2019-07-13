@@ -1,5 +1,6 @@
 from flask import session, request, jsonify
 from traders.market import markets
+import json
 
 
 def error(message: str):
@@ -10,18 +11,21 @@ def error(message: str):
 def check_json_values(**form_values):
     def wrapper(f):
         def inner(*args, **kwargs):
-            checked_form = dict(request.json)
+            if request.json is None:
+                request_json = json.loads(request.data.decode())
+            else:
+                request_json = request.json
+            checked_json = dict(request_json)
             for arg, typ in form_values.items():
-                arg_value = request.json.get(arg)
+                arg_value = request_json.get(arg)
                 if arg_value is None:
                     return jsonify(error(f"Parameter {arg} must be passed"))
                 try:
-                    checked_form[arg] = typ(arg_value)
+                    checked_json[arg] = typ(arg_value)
                 except ValueError:
                     return jsonify(error(f"Parameter {arg} type should be {typ} but got {type(arg_value)}"))
 
-
-            request.getJson = lambda: checked_form
+            request.checked_json = checked_json
             return f(*args, **kwargs)
         inner.__name__ = f.__name__
         return inner

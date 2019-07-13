@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import { Button, FormGroup, FormControl, ControlLabel } from "react-bootstrap";
+import { post } from "../utils"
 import "./Login.css";
 
 export default class Login extends Component {
@@ -23,23 +24,18 @@ export default class Login extends Component {
 
   handleSubmit = event => {
     event.preventDefault();
-    fetch("http://localhost:5000/login", {
-        method:"POST",
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        body: JSON.stringify({
-            name: this.state.user_name
-        })
-    }).then((response) => response.json())
-    .then((data) => {
-        if(data.status === "login succesful"){
-            this.props.user_has_logged_in(true);
-        } else {
-            alert(data.error);
-        }
-    }).catch((error) => {console.error(error);});
+    post("http://localhost:5000/login", {
+      name: this.state.user_name
+    }, (resp) => {
+      if(resp.status === "login succesful"){
+        this.props.user_has_logged_in(true, this.state.user_name);
+        this.props.history.push("/");
+      } else {
+        alert(resp.error);
+      }
+    }, (error) => {
+      console.error(error);
+    })
   }
 
   render() {

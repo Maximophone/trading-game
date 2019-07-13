@@ -6,12 +6,22 @@ from traders.market import Market, Sides, markets
 from traders.app_utils import error, check_market, check_participant, check_json_values, check_logged_in
 
 app = Flask(__name__, static_url_path="/static/")
-cors = CORS(app)
+cors = CORS(app, supports_credentials=True)
 app.config["CORS_HEADERS"] = "Content-Type"
 
 app.secret_key = b"dummy_key"
 
 USERS = set()
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    if "Access-Control-Allow-Credentials" in response.headers:
+        response.headers.set('Access-Control-Allow-Credentials', 'true')
+    else:
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 def get_markets_list():
     return [{
@@ -34,13 +44,15 @@ def index():
 def login():
     if "user_id" in session:
         return jsonify(error("Already logged in with username " + session["user_id"]))
-    if request.json["name"] in USERS:
+    if request.checked_json["name"] in USERS:
         return jsonify(error("Username is already taken, please choose an other one"))
-    session["user_id"] = request.json["name"]
-    USERS.add(request.json["name"])
-    return jsonify({"status": "login succesful"})
+    session["user_id"] = request.checked_json["name"]
+    USERS.add(request.checked_json["name"])
+    resp = jsonify({"status": "login succesful"})
+    return resp
 
 @app.route("/login", methods=["GET"])
+@cross_origin()
 def get_login():
     if "user_id" in session:
         return jsonify({
@@ -55,7 +67,7 @@ def get_login():
 @app.route("/markets/new", methods=["POST"])
 @check_json_values(name=str)
 def new_market():
-    name = request.json["name"]
+    name = request.checked_json["name"]
     if not name.isalnum():
         return jsonify(error("Market name must be alphanumeric without space"))
     if name in markets:
@@ -106,7 +118,7 @@ def get_books(market_id):
 def post_order_buy(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    market.post_order(user_id, Sides.BUY, request.json["quantity"], request.json["price"])
+    market.post_order(user_id, Sides.BUY, request.checked_json["quantity"], request.checked_json["price"])
     return jsonify({})
 
 @app.route("/market/<market_id>/order/post/sell", methods=["POST"])
@@ -117,7 +129,7 @@ def post_order_buy(market_id):
 def post_order_sell(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    market.post_order(user_id, Sides.SELL, request.json["quantity"], request.json["price"])
+    market.post_order(user_id, Sides.SELL, request.checked_json["quantity"], request.checked_json["price"])
     return jsonify({})
 
 @app.route("/market/<market_id>/order/take/buy", methods=["POST"])
@@ -128,7 +140,7 @@ def post_order_sell(market_id):
 def take_order_buy(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    side, quantity, price = Sides.BUY, request.json["quantity"], request.json["price"]
+    side, quantity, price = Sides.BUY, request.checked_json["quantity"], request.checked_json["price"]
     filled = market.take_order(user_id, side, quantity, price)
     return jsonify({
         "filled": filled
@@ -142,7 +154,7 @@ def take_order_buy(market_id):
 def take_order_sell(market_id):
     market = markets.get(market_id)
     user_id = session["user_id"]
-    side, quantity, price = Sides.SELL, request.json["quantity"], request.json["price"]
+    side, quantity, price = Sides.SELL, request.checked_json["quantity"], request.checked_json["price"]
     filled = market.take_order(user_id, side, quantity, price)
     return jsonify({
         "filled": filled
