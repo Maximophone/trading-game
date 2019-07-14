@@ -1,4 +1,4 @@
-import React, { Component, Fragment } from "react";
+import React, { Component } from "react";
 import { Link } from "react-router-dom";
 import { Navbar, Nav, NavItem } from "react-bootstrap";
 import { LinkContainer } from "react-router-bootstrap";
@@ -19,7 +19,6 @@ class App extends Component {
 
   async componentDidMount(){
     get("http://localhost:5000/login", (data) => {
-      this.state.is_logged_in = data.logged_in;
       this.user_has_logged_in(data.logged_in, data.name)
     }, (error) => {
       console.error(error);

@@ -64,6 +64,7 @@ def get_login():
         })
 
 @app.route("/markets/new", methods=["POST"])
+@cross_origin()
 @check_json_values(name=str)
 def new_market():
     name = request.checked_json["name"]
@@ -76,6 +77,7 @@ def new_market():
     return jsonify({"market_id": name})
 
 @app.route("/markets", methods=["GET"])
+@cross_origin()
 def get_markets():
     return jsonify(get_markets_list())
 
