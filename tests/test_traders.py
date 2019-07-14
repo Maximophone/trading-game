@@ -92,7 +92,7 @@ def test_market_view(client):
     
     participant_max = participants[0]
 
-    assert participant_max == {"id": "max", "name": "max", "portfolio": {"assets": 0, "capital": 0}}
+    assert participant_max == {"id": "max", "name": "max", "portfolio": {"assets": 0, "capital": 0}, "open": False, "bid_price": -1, "ask_price": -1}
 
     books = resp["books"]
 

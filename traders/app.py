@@ -56,7 +56,10 @@ def view_participant(id: str, participant: Participant) -> Dict[str, Any]:
     return {
         "id": id,
         "name": participant.name,
-        "portfolio": view_portfolio(participant.portfolio)
+        "portfolio": view_portfolio(participant.portfolio),
+        "open": participant.open,
+        "bid_price": participant.bid_price,
+        "ask_price": participant.ask_price
     }
 
 def view_participants(market: Market):
