@@ -20,10 +20,14 @@ class Portfolio:
     def liquidate(self, price):
         self.capital += self.assets*price
 
-class Participant(NamedTuple):
+@dataclass
+class Participant:
     name: str
     hidden_value: int
     portfolio: Portfolio
+    bid_price: float = -1
+    ask_price: float = -1
+    open: bool = False
 
 class Sides:
     BUY = True
@@ -114,6 +118,43 @@ class Market(Thread):
             return self.buy_book
         if side==Sides.SELL:
             return self.sell_book
+
+    def take_price(self, user_id: str, counterparty_id: str, side: bool, price: float) -> bool:
+        assert user_id in self.participants
+        assert counterparty_id in self.participants
+        participant = self.participants[user_id]
+        counterparty = self.participants[counterparty_id]
+        assert participant.open
+        if not counterparty.open:
+            return False
+        # TODO: there will be synchronisation problems, when somebody closes their
+        # prices while somebody else is taking it
+        current_price = counterparty.bid_price if side == Sides.BUY else counterparty.ask_price
+        if price != current_price:
+            # The price has changed, we don't take it
+            return False
+        if side == Sides.BUY:
+            participant.portfolio.sell_assets(1, price)
+            counterparty.portfolio.buy_assets(1, price)
+        if side == Sides.SELL:
+            participant.portfolio.buy_assets(1, price)
+            counterparty.portfolio.sell_assets(1, price)
+        return True
+
+    def set_price(self, user_id: str, side: bool, price: float):
+        assert user_id in self.participants
+        assert price > 0
+        participant = self.participants[user_id]
+        if side == Sides.BUY:
+            participant.bid_price = price
+        else:
+            participant.ask_price = price
+
+    def set_open(self, user_id: str, is_open: bool):
+        assert user_id in self.participants
+        participant = self.participants[user_id]
+        assert participant.bid_price >= 0 and participant.ask_price >= 0, "Must set prices before opening for offers"
+        participant.open = is_open
 
 def clear_markets(markets):
     keys = list(markets.keys())

@@ -1,6 +1,6 @@
 from traders import __version__
 from traders.app import app, USERS
-from traders.market import markets, init_markets
+from traders.market import markets, init_markets, Sides
 
 import pytest
 
@@ -107,7 +107,6 @@ def test_market_view(client):
     price_level_10 = buy_book["10"]
 
     assert len(price_level_10) == 3
-
     assert price_level_10[0] == {"filled": 0, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
 
 def test_scenario(client):
@@ -190,3 +189,67 @@ def test_scenario(client):
     
     portfolio_bob = get_200(client_bob, "/market/2/portfolio")
     assert portfolio_bob == {"assets": -60, "capital": 600.}
+
+def login_test(name, client=None):
+    if client is None:
+        client = app.test_client()
+    login_resp = post_200(client, "/login", json={"name": name})
+    assert login_resp == {"status": "login succesful"}
+    return client
+
+def join_test(client, market_id):
+    join_resp = post_200(client, f"/market/{market_id}/join")
+    assert "market_values" in join_resp
+    assert "hidden_value" in join_resp
+
+def portfolio_test(client, market_id, expected_assets, expected_capital):
+    portfolio = get_200(client, f"/market/{market_id}/portfolio")
+    assert portfolio == {"assets": expected_assets, "capital": expected_capital}
+
+def test_taking_price(client):
+    post_200(client, "/markets/new", json=dict(name="2"))
+    
+    # Max logs in
+    login_test("max", client)
+
+    # Max joins the market
+    join_test(client, "2")
+
+    # Max tries to open his offers but gets an error
+    open_error = post_200(client, "market/2/offers/set_open", json={"open": True})
+    assert open_error == {"error": "bid and ask prices must be set before opening"}
+
+    # Max sets his prices
+    set_price_buy_resp = post_200(client, "market/2/offers/set/buy", json={"price": 10})
+    assert set_price_buy_resp == {"status": "success"}
+
+    set_price_sell_resp = post_200(client, "market/2/offers/set/sell", json={"price": 12})
+    assert set_price_sell_resp == {"status": "success"}
+
+    # Max opens his offers
+    open_resp = post_200(client, "market/2/offers/set_open", json={"open": True})
+    assert open_resp == {"status": "success"}
+
+    # Bob logs in
+    client_bob = login_test("bob")
+
+    # Bob joins the market
+    join_test(client_bob, "2")
+
+    # Bob sets his prices
+    set_price_buy_resp = post_200(client_bob, "market/2/offers/set/buy", json={"price": 8})
+    set_price_sell_resp = post_200(client_bob, "market/2/offers/set/sell", json={"price": 15})
+
+    # Bob opens his offers
+    open_resp = post_200(client_bob, "market/2/offers/set_open", json={"open": True})
+    assert open_resp == {"status": "success"}
+    assert markets["2"].participants["bob"].open
+
+    # Bob takes Max's sell price
+    take_sell_resp = post_200(client_bob, "market/2/offers/take", json={"counterparty_id": "max", "price": 12, "side": Sides.SELL})
+    assert take_sell_resp == {"status": "success"}
+
+    # checking portfolios
+    portfolio_test(client, "2", -1, 12)
+    portfolio_test(client_bob, "2", 1, -12)
+

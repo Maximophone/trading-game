@@ -206,5 +206,64 @@ def get_portfolio(market_id):
         "assets": portfolio.assets
     })
 
+@app.route("/market/<market_id>/offers/set/<side>", methods=["POST"])
+@cross_origin()
+@check_market
+@check_participant
+@check_json_values(price=float)
+def set_price(market_id, side):
+    if side not in ("buy", "sell"):
+        return jsonify(error("side must be 'buy' or 'sell'"))
+    market = markets.get(market_id)
+    user_id = session["user_id"]
+    market.set_price(user_id, Sides.BUY if side=="buy" else Sides.SELL, request.checked_json["price"])
+    return jsonify({
+        "status": "success"
+    })
+
+@app.route("/market/<market_id>/offers/set_open", methods=["POST"])
+@cross_origin()
+@check_market
+@check_participant
+@check_json_values(open=bool)
+def set_open(market_id):
+    market = markets.get(market_id)
+    user_id = session["user_id"]
+    participant = market.participants[user_id]
+    open_ = request.checked_json["open"]
+    if open_ and (participant.bid_price < 0 or participant.ask_price < 0):
+        return jsonify(error("bid and ask prices must be set before opening"))
+    market.set_open(user_id, open_)
+    return jsonify({
+        "status": "success"
+    })
+
+@app.route("/market/<market_id>/offers/take", methods=["POST"])
+@cross_origin()
+@check_market
+@check_participant
+@check_json_values(counterparty_id = str, price = float, side = bool)
+def take_offer(market_id):
+    market = markets.get(market_id)
+    user_id = session["user_id"]
+    participant = market.participants[user_id]
+    if not participant.open:
+        return jsonify(error("must be open to offers to be able to take offers"))
+    counterparty_id, price, side = request.checked_json["counterparty_id"], request.checked_json["price"], request.checked_json["side"]
+    if counterparty_id not in market.participants:
+        return jsonify(error("counterparty is not in market"))
+    counterparty = market.participants[counterparty_id]
+    if not counterparty.open:
+        return jsonify(error("counterparty is closed to offers"))
+    counterparty_price = counterparty.bid_price if side==Sides.BUY else counterparty.ask_price
+    if counterparty_price != price:
+        return jsonify(error("counterparty price has changed"))
+    success = market.take_price(user_id, counterparty_id, side, counterparty_price)
+    if not success:
+        return jsonify(error("counterparty has closed to offers or changed price"))
+    return jsonify({
+        "status": "success"
+    })
+
 if __name__ == "__main__":
     app.run(port=4000, debug=True)
