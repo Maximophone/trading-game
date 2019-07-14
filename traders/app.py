@@ -207,6 +207,7 @@ def take_order_sell(market_id):
     })
 
 @app.route("/market/<market_id>/portfolio", methods=["GET"])
+@cross_origin()
 @check_market
 @check_logged_in
 @check_participant
@@ -217,6 +218,21 @@ def get_portfolio(market_id):
     return jsonify({
         "capital": portfolio.capital,
         "assets": portfolio.assets
+    })
+
+@app.route("/market/<market_id>/offers/set", methods=["POST"])
+@cross_origin()
+@check_market
+@check_participant
+@check_json_values(is_open=bool, sell_price=float, buy_price=float)
+def set_prices(market_id):
+    market = markets.get(market_id)
+    user_id = session["user_id"]
+    market.set_price(user_id, Sides.BUY, request.checked_json["buy_price"])
+    market.set_price(user_id, Sides.SELL, request.checked_json["sell_price"])
+    market.set_open(user_id, request.checked_json["is_open"])
+    return jsonify({
+        "status": "success"
     })
 
 @app.route("/market/<market_id>/offers/set/<side>", methods=["POST"])

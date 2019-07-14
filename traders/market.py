@@ -143,7 +143,7 @@ class Market(Thread):
 
     def set_price(self, user_id: str, side: bool, price: float):
         assert user_id in self.participants
-        assert price > 0
+        assert price >= 0
         participant = self.participants[user_id]
         if side == Sides.BUY:
             participant.bid_price = price

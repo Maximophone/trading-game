@@ -55,7 +55,7 @@ export default class NewMarket extends Component {
                         block
                         bsStyle="primary"
                         bsSize="large"
-                        disable={!this.validateForm()}
+                        disabled={!this.validateForm()}
                         type="submit"
                         is_loading={this.state.is_loading}
                         text="Create"

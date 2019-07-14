@@ -29,3 +29,7 @@ export function post(url, data, success, error){
 export function get(url, success, error){
     return request("GET", url, null, success, error);
 }
+
+export function is_float(x){
+    return !isNaN(x) && !(x == null)
+}
