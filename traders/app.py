@@ -1,8 +1,9 @@
 from flask import Flask, session, request, Response, jsonify, render_template
 from flask_cors import CORS, cross_origin
 from dataclasses import asdict
+from typing import Dict, Any
 
-from traders.market import Market, Sides, markets
+from traders.market import Market, Sides, markets, Participant, Portfolio
 from traders.app_utils import error, check_market, check_participant, check_json_values, check_logged_in
 
 app = Flask(__name__, static_url_path="/static/")
@@ -23,12 +24,46 @@ def after_request(response):
         response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
 
-def get_markets_list():
+def view_markets():
     return [{
             "id": id,
             "is_open": mkt.open,
         }
         for id, mkt in markets.items()]
+
+def view_market(id: str, market: Market):
+    ret = {"name": id, "id": id}
+    ret["books"] = view_books(market)
+    ret["participants"] = view_participants(market)
+    return ret
+
+def view_books(market: Market):
+    ret = {}
+    for side, book in [("buy", market.buy_book), ("sell", market.sell_book)]:
+        ret[side] = {
+            price: [asdict(order) for order in orders]
+            for price, orders in book.items()
+            }
+    return ret
+
+def view_portfolio(portfolio: Portfolio) -> Dict[str, Any]:
+    return {
+        "assets": portfolio.assets,
+        "capital": portfolio.capital
+    }
+
+def view_participant(id: str, participant: Participant) -> Dict[str, Any]:
+    return {
+        "id": id,
+        "name": participant.name,
+        "portfolio": view_portfolio(participant.portfolio)
+    }
+
+def view_participants(market: Market):
+    participants_list = []
+    for p_id, participant in market.participants.items():
+        participants_list.append(view_participant(p_id, participant))
+    return participants_list
 
 @app.route("/ping")
 def ping():
@@ -36,7 +71,7 @@ def ping():
 
 @app.route("/")
 def index():
-    return render_template("index.html",  markets=get_markets_list())
+    return render_template("index.html",  markets=view_markets())
 
 @app.route("/login", methods=["POST"])
 @cross_origin()
@@ -79,11 +114,14 @@ def new_market():
 @app.route("/markets", methods=["GET"])
 @cross_origin()
 def get_markets():
-    return jsonify(get_markets_list())
+    return jsonify(view_markets())
 
 @app.route("/market/<market_id>")
-def market_index(market_id):
-    return render_template("market.html", market_id=market_id)
+@cross_origin()
+@check_market
+def market_view(market_id):
+    market = markets.get(market_id)
+    return jsonify(view_market(market_id, market))
 
 @app.route("/market/<market_id>/join", methods=["POST"])
 @check_market
@@ -101,15 +139,9 @@ def join_market(market_id):
 
 @app.route("/market/<market_id>/books", methods=["GET"])
 @check_market
-def get_books(market_id):
+def market_books(market_id):
     market = markets.get(market_id)
-    ret = {}
-    for side, book in [("buy", market.buy_book), ("sell", market.sell_book)]:
-        ret[side] = {
-            price: [asdict(order) for order in orders]
-            for price, orders in book.items()
-            }
-    return jsonify(ret)
+    return jsonify(view_books(market))
 
 @app.route("/market/<market_id>/order/post/buy", methods=["POST"])
 @check_market

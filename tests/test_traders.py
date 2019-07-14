@@ -1,12 +1,16 @@
 from traders import __version__
 from traders.app import app, USERS
-from traders.market import markets
+from traders.market import markets, init_markets
 
 import pytest
 
 @pytest.fixture(autouse=True)
 def clear_users():
     USERS.clear()
+
+@pytest.fixture(autouse=True)
+def restart_markets():
+    init_markets(markets)
 
 @pytest.fixture
 def client():
@@ -72,6 +76,40 @@ def test_login(client):
     resp = get_200(client, "/login")
     assert resp == {"logged_in": True, "name": "max"}
 
+def test_market_view(client):
+    resp = get_200(client, "/market/Market1")
+    assert "books" in resp
+    assert "participants" in resp
+    assert "name" in resp
+    assert "id" in resp
+
+    assert resp["id"] == "Market1"
+    assert resp["name"] == "Market1"
+
+    participants = resp["participants"]
+
+    assert len(participants) == 3
+    
+    participant_max = participants[0]
+
+    assert participant_max == {"id": "max", "name": "max", "portfolio": {"assets": 0, "capital": 0}}
+
+    books = resp["books"]
+
+    assert "buy" in books
+    assert "sell" in books
+
+    buy_book = books["buy"]
+
+    assert "10" in buy_book
+    assert "5" in buy_book
+
+    price_level_10 = buy_book["10"]
+
+    assert len(price_level_10) == 3
+
+    assert price_level_10[0] == {"filled": 0, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
+
 def test_scenario(client):
     post_200(client, "/markets/new", json=dict(name="2"))
     
@@ -94,8 +132,8 @@ def test_scenario(client):
 
     expected_book = {
         "buy": {
-            "10": [
-                {"filled": 0, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
+            "10.0": [
+                {"filled": 0, "participant_id": "max", "price": 10., "quantity": 100, "side": True}
             ]
         }, 
         "sell": {}
@@ -112,8 +150,8 @@ def test_scenario(client):
     book_resp = get_200(client, "/market/2/books")
     expected_book = {
         "buy": {
-            "10": [
-                {"filled": 40, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
+            "10.0": [
+                {"filled": 40, "participant_id": "max", "price": 10., "quantity": 100, "side": True}
             ]
         },
         "sell": {}
@@ -138,8 +176,8 @@ def test_scenario(client):
     book_resp = get_200(client_bob, "/market/2/books")
     expected_book = {
         "buy": {
-            "10": [
-                {"filled": 100, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
+            "10.0": [
+                {"filled": 100, "participant_id": "max", "price": 10., "quantity": 100, "side": True}
             ]
         },
         "sell": {}

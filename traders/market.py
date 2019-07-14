@@ -115,14 +115,26 @@ class Market(Thread):
         if side==Sides.SELL:
             return self.sell_book
 
-market_test = Market()
-markets: Dict[str, Market] = {"Market1": market_test}
-market_test.join_market("max")
-market_test.join_market("bob")
-market_test.join_market("john")
-market_test.post_order("max", True, 100, 10)
-market_test.post_order("bob", False, 100, 20)
-market_test.post_order("max", False, 50, 10)
-market_test.post_order("john", True, 100, 5)
-market_test.post_order("max", True, 30, 10)
-market_test.post_order("bob", True, 20, 10)
+def clear_markets(markets):
+    keys = list(markets.keys())
+    for market_id in keys:
+        market = markets.pop(market_id)
+        market.open = False
+        del market
+
+def init_markets(markets):
+    clear_markets(markets)
+    market_test = Market()
+    market_test.join_market("max")
+    market_test.join_market("bob")
+    market_test.join_market("john")
+    market_test.post_order("max", True, 100, 10)
+    market_test.post_order("bob", False, 100, 20)
+    market_test.post_order("max", False, 50, 10)
+    market_test.post_order("john", True, 100, 5)
+    market_test.post_order("max", True, 30, 10)
+    market_test.post_order("bob", True, 20, 10)
+    markets["Market1"] = market_test
+
+markets: Dict[str, Market] = {}
+init_markets(markets)
