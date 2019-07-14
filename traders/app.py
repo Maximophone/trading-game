@@ -48,8 +48,7 @@ def login():
         return jsonify(error("Username is already taken, please choose an other one"))
     session["user_id"] = request.checked_json["name"]
     USERS.add(request.checked_json["name"])
-    resp = jsonify({"status": "login succesful"})
-    return resp
+    return jsonify({"status": "login succesful"})
 
 @app.route("/login", methods=["GET"])
 @cross_origin()

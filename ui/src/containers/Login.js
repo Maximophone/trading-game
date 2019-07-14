@@ -2,6 +2,7 @@ import React, { Component } from "react";
 import { Button, FormGroup, FormControl, ControlLabel } from "react-bootstrap";
 import { post } from "../utils"
 import "./Login.css";
+import LoaderButton from "../components/LoaderButton";
 
 export default class Login extends Component {
   constructor(props) {
@@ -9,6 +10,7 @@ export default class Login extends Component {
 
     this.state = {
       user_name: "",
+      is_loading: false,
     };
   }
 
@@ -24,6 +26,7 @@ export default class Login extends Component {
 
   handleSubmit = event => {
     event.preventDefault();
+    this.setState({is_loading: true});
     post("http://localhost:5000/login", {
       name: this.state.user_name
     }, (resp) => {
@@ -32,6 +35,7 @@ export default class Login extends Component {
         this.props.history.push("/");
       } else {
         alert(resp.error);
+        this.setState({is_loading: false});
       }
     }, (error) => {
       console.error(error);
@@ -51,14 +55,15 @@ export default class Login extends Component {
               onChange={this.handleChange}
             />
           </FormGroup>
-          <Button
+          <LoaderButton
             block
             bsSize="large"
             disabled={!this.validateForm()}
             type="submit"
-          >
-            Login
-          </Button>
+            is_loading={this.state.is_loading}
+            text="Login"
+            loading_text="Logging in..."
+            />
         </form>
       </div>
     );
