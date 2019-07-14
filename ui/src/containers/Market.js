@@ -19,6 +19,7 @@ export default class Market extends Component {
             hidden_value: null,
             portfolio: null,
             is_setting: false,
+            open: null,
             price_setting: {
                 sell_price: null,
                 buy_price: null,
@@ -44,6 +45,7 @@ export default class Market extends Component {
                     joined: data.joined,
                     market_values: data.market_values,
                     hidden_value: data.hidden_value,
+                    open: data.open,
                 });
                 if(data.joined){
                     this.getPortfolio();
@@ -174,43 +176,46 @@ export default class Market extends Component {
             return;
         }
         return (
-            <Form inline onSubmit={this.handleSetPrices}>
-                <FormGroup controlId="sell_price">
-                    <ControlLabel>Sell Price</ControlLabel>
-                    <FormControl
-                        onChange={this.handleSetPriceChange}
-                        value={this.state.price_setting.sell_price}
-                        componentClass="input"
+            <div className="price_setting">
+                <Form inline onSubmit={this.handleSetPrices}>
+                    <FormGroup controlId="sell_price">
+                        <ControlLabel>Sell Price</ControlLabel>
+                        <FormControl
+                            onChange={this.handleSetPriceChange}
+                            value={this.state.price_setting.sell_price}
+                            componentClass="input"
+                        />
+                    </FormGroup>
+                    {"  "}
+                    <FormGroup controlId="buy_price">
+                        <ControlLabel>Buy Price</ControlLabel>
+                        <FormControl
+                            onChange={this.handleSetPriceChange}
+                            value={this.state.price_setting.buy_price}
+                            componentClass="input"
+                        />
+                    </FormGroup>
+                    {"  "}
+                    <FormGroup controlId="price_open">
+                        <Checkbox 
+                            name="test"
+                            checked={this.state.price_setting.open}
+                            onChange={this.handleSetPriceChange}
+                            >Open</Checkbox>
+                    </FormGroup>
+                    <LoaderButton
+                        inline
+                        bsStyle="primary"
+                        bsSize="small"
+                        type="submit"
+                        disabled={!this.validatePrices()}
+                        is_loading={this.state.is_setting}
+                        text="Set Your Prices"
+                        loading_text="Setting..."
                     />
-                </FormGroup>
-                {"  "}
-                <FormGroup controlId="buy_price">
-                    <ControlLabel>Buy Price</ControlLabel>
-                    <FormControl
-                        onChange={this.handleSetPriceChange}
-                        value={this.state.price_setting.buy_price}
-                        componentClass="input"
-                    />
-                </FormGroup>
-                {"  "}
-                <FormGroup controlId="price_open">
-                    <Checkbox 
-                        name="test"
-                        checked={this.state.price_setting.open}
-                        onChange={this.handleSetPriceChange}
-                        >Open</Checkbox>
-                </FormGroup>
-                <LoaderButton
-                    inline
-                    bsStyle="primary"
-                    bsSize="small"
-                    type="submit"
-                    disabled={!this.validatePrices()}
-                    is_loading={this.state.is_setting}
-                    text="Set Your Prices"
-                    loading_text="Setting..."
-                />
-            </Form>
+                </Form>
+                <br/>
+            </div>
         )
     }
 

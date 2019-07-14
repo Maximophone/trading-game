@@ -1,5 +1,14 @@
 .values {
-    width: 25%;
+    width: 50%;
+    display: flex;
+}
+
+.market_values { 
+    flex: 0 0 65%;
+}
+
+.hidden_value {
+    flex: 1;
 }
 
 .portfolio {

@@ -77,6 +77,7 @@ def test_login(client):
     assert resp == {"logged_in": True, "name": "max"}
 
 def test_market_view(client):
+    login_test("max", client)
     resp = get_200(client, "/market/Market1")
     assert "books" in resp
     assert "participants" in resp

@@ -36,6 +36,7 @@ def view_market(id: str, market: Market):
     ret["books"] = view_books(market)
     ret["participants"] = view_participants(market)
     ret["market_values"] = market.values
+    ret["open"] = market.open
     return ret
 
 def view_books(market: Market):

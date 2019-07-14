@@ -4,6 +4,9 @@ import random
 from threading import Thread
 import time
 
+CLOSING_TIME = 60 * 5 - 1
+UPDATE_FREQUENCY = 60
+
 class Portfolio:
     def __init__(self):
         self.capital = 0
@@ -45,8 +48,10 @@ class Market(Thread):
     def __init__(self):
         self.open = True
         self.timer = 0
-        self.closing_time = 100
+        self.closing_time = CLOSING_TIME
+        self.update_frequency = UPDATE_FREQUENCY
         self.values = [self.pick_new_value()]
+        self.final_value = None
         self.ip_tokens: Dict[str, str] = {}
         self.token_id: Dict[str, str] = {}
         self.participants: Dict[id, Participant] = {}
@@ -59,7 +64,10 @@ class Market(Thread):
         while(self.open):
             time.sleep(1)
             self.timer += 1
+            if self.timer % self.update_frequency == 0:
+                self.values.append(self.pick_new_value())
             if self.timer >= self.closing_time:
+                self.liquidate()
                 self.open=False
 
     def pick_new_value(self) -> int:
@@ -68,6 +76,14 @@ class Market(Thread):
     @staticmethod
     def gen_token() -> str:
         return f"{random.getrandbits(32):x}"
+
+    def liquidate(self):
+        all_values = self.values + [p.hidden_value for p in self.participants]
+        self.final_value = sum(all_values)/len(all_values)
+        for participant in self.participants:
+            portfolio = participant.portfolio
+            portfolio.capital += portfolio.assets * self.final_value
+            portfolio.assets = 0
 
     def get_id(self, token: str) -> str:
         assert token in self.token_id
@@ -179,6 +195,7 @@ def init_markets(markets):
     market_test.post_order("max", True, 30, 10)
     market_test.post_order("bob", True, 20, 10)
     markets["Market1"] = market_test
+    market_test.start()
 
 markets: Dict[str, Market] = {}
 init_markets(markets)
