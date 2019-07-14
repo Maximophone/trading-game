@@ -35,6 +35,7 @@ def view_market(id: str, market: Market):
     ret = {"name": id, "id": id}
     ret["books"] = view_books(market)
     ret["participants"] = view_participants(market)
+    ret["market_values"] = market.values
     return ret
 
 def view_books(market: Market):
@@ -121,12 +122,19 @@ def get_markets():
 
 @app.route("/market/<market_id>")
 @cross_origin()
+@check_logged_in
 @check_market
 def market_view(market_id):
     market = markets.get(market_id)
-    return jsonify(view_market(market_id, market))
+    market_view = view_market(market_id, market)
+    user_id = session["user_id"]
+    market_view["joined"] = user_id in market.participants
+    if user_id in market.participants:
+        market_view["hidden_value"] = market.participants[user_id].hidden_value
+    return jsonify(market_view)
 
 @app.route("/market/<market_id>/join", methods=["POST"])
+@cross_origin()
 @check_market
 @check_logged_in
 def join_market(market_id):
@@ -135,9 +143,11 @@ def join_market(market_id):
     if user_id in market.participants:
         return jsonify(error(f"User already in market, can only join once"))
     hidden_value = market.join_market(user_id)
+    participants = view_participants(market)
     return jsonify({
         "market_values": market.values,
-        "hidden_value": hidden_value
+        "hidden_value": hidden_value,
+        "participants": participants
     })
 
 @app.route("/market/<market_id>/books", methods=["GET"])
