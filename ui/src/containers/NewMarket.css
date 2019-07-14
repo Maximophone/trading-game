@@ -1,0 +1,8 @@
+.NewMarket form {
+    padding-bottom: 15px;
+}
+
+.NewMarket form textarea {
+    height: 50px;
+    font-size: 24px;
+}

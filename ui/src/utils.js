@@ -1,3 +1,5 @@
+import { API_ADDRESS } from "./config.js"
+
 function request(method, url, data, success, error){
     var fetch_data
     if(method==="GET"){
@@ -16,7 +18,7 @@ function request(method, url, data, success, error){
             body: JSON.stringify(data),
         }
     }
-    return fetch(url, fetch_data).then((response) => response.json())
+    return fetch(API_ADDRESS + url, fetch_data).then((response) => response.json())
     .then(success).catch(error);
 }
 

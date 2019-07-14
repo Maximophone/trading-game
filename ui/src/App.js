@@ -18,7 +18,7 @@ class App extends Component {
   }
 
   async componentDidMount(){
-    get("http://localhost:5000/login", (data) => {
+    get("login", (data) => {
       this.user_has_logged_in(data.logged_in, data.name)
     }, (error) => {
       console.error(error);

@@ -21,7 +21,7 @@ export default class Home extends Component {
     }
     console.log("passed the is logged in check");
 
-    get("http://localhost:5000/markets", (markets) => {
+    get("markets", (markets) => {
       this.setState({ markets });
     }, (error) => {
       alert(error);

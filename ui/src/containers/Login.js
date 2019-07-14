@@ -27,7 +27,7 @@ export default class Login extends Component {
   handleSubmit = event => {
     event.preventDefault();
     this.setState({is_loading: true});
-    post("http://localhost:5000/login", {
+    post("login", {
       name: this.state.user_name
     }, (resp) => {
       if(resp.status === "login succesful"){
