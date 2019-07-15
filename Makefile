@@ -9,3 +9,6 @@ run80:
 
 babel:
 	npx babel --watch traders/staticx --out-dir traders/static --presets react-app/prod
+
+gen_secret:
+	poetry run python -c 'import os; print(f"SECRET_KEY = {os.urandom(16)}")' > traders/secret.py

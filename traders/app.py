@@ -5,13 +5,14 @@ from typing import Dict, Any
 
 from traders.market import Market, Sides, Participant, Portfolio, init_markets, init_with_bots
 from traders.bots import Bot, BOT_NAMES
+from traders.secret import SECRET_KEY
 
 app = Flask(__name__, static_url_path="/static/")
 cors = CORS(app, supports_credentials=True)
 socketio = SocketIO(app)
 app.config["CORS_HEADERS"] = "Content-Type"
 
-app.secret_key = b"dummy_key"
+app.secret_key = SECRET_KEY
 
 USERS = set()
 MARKETS: Dict[str, Market] = {}
