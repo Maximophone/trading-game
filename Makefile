@@ -15,3 +15,6 @@ babel:
 
 gen_secret:
 	poetry run python -c 'import os; print(f"SECRET_KEY = {os.urandom(16)}")' > traders/secret.py
+
+gen_server_address:
+	poetry run python -c 'with open("server_address.txt") as f: print(f"export var API_ADDRESS = \"{f.read()}/\"")' > ui/src/config.js
