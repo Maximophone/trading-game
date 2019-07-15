@@ -18,3 +18,9 @@ gen_secret:
 
 gen_server_address:
 	poetry run python -c 'with open("server_address.txt") as f: print(f"export var API_ADDRESS = \"{f.read()}/\"")' > ui/src/config.js
+
+build_ui:
+	cd ui && npm run build
+
+serve_ui:
+	cd ui && serve -s build
