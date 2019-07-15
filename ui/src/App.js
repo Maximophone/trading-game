@@ -3,17 +3,18 @@ import { Link } from "react-router-dom";
 import { Navbar, Nav, NavItem } from "react-bootstrap";
 import { LinkContainer } from "react-router-bootstrap";
 import Routes from "./Routes";
-import {get} from "./utils";
+import {get, get_socket} from "./utils";
 import "./App.css";
 
 class App extends Component {
   constructor(props) {
     super(props);
-  
+
     this.state = {
       is_logged_in: false,
       is_logging_in: true,
       user_name: "",
+      socket: null,
     };
   }
 
@@ -23,7 +24,7 @@ class App extends Component {
     }, (error) => {
       console.error(error);
     });
-    this.setState({is_logging_in: false});
+    this.setState({is_logging_in: false, socket: get_socket()});
   }
 
   user_has_logged_in = (logged_in, name) => {
@@ -37,6 +38,8 @@ class App extends Component {
     const child_props = {
       is_logged_in: this.state.is_logged_in,
       user_has_logged_in: this.user_has_logged_in,
+      socket: this.state.socket,
+      user_name: this.state.user_name,
     }
     return (
       !this.state.is_logging_in &&

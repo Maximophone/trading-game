@@ -1,18 +1,24 @@
 from flask import Flask, session, request, Response, jsonify, render_template
 from flask_cors import CORS, cross_origin
-from dataclasses import asdict
+from flask_socketio import SocketIO
 from typing import Dict, Any
 
-from traders.market import Market, Sides, markets, Participant, Portfolio
-from traders.app_utils import error, check_market, check_participant, check_json_values, check_logged_in
+from traders.market import Market, Sides, Participant, Portfolio, init_markets, init_with_bots
+from traders.bots import Bot, BOT_NAMES
 
 app = Flask(__name__, static_url_path="/static/")
 cors = CORS(app, supports_credentials=True)
+socketio = SocketIO(app)
 app.config["CORS_HEADERS"] = "Content-Type"
 
 app.secret_key = b"dummy_key"
 
 USERS = set()
+MARKETS: Dict[str, Market] = {}
+
+from traders.app_utils import error, check_market, check_participant, check_json_values, check_logged_in
+from traders.views import *
+
 
 @app.after_request
 def after_request(response):
@@ -24,51 +30,22 @@ def after_request(response):
         response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
 
-def view_markets():
-    return [{
-            "id": id,
-            "is_open": mkt.open,
-        }
-        for id, mkt in markets.items()]
+@socketio.on("connection")
+def handle_connection(json):
+    print(f"New connection: {json}")
+    return request.sid
 
-def view_market(id: str, market: Market):
-    ret = {"name": id, "id": id}
-    ret["books"] = view_books(market)
-    ret["participants"] = view_participants(market)
-    ret["market_values"] = market.values
-    ret["open"] = market.open
-    return ret
+@socketio.on("disconnect")
+def handle_disconnection():
+    print(f"Session id: {request.sid} disconnected")
 
-def view_books(market: Market):
-    ret = {}
-    for side, book in [("buy", market.buy_book), ("sell", market.sell_book)]:
-        ret[side] = {
-            price: [asdict(order) for order in orders]
-            for price, orders in book.items()
-            }
-    return ret
+def ping_users():
+    socketio.emit("ping", "ping")
 
-def view_portfolio(portfolio: Portfolio) -> Dict[str, Any]:
-    return {
-        "assets": portfolio.assets,
-        "capital": portfolio.capital
-    }
-
-def view_participant(id: str, participant: Participant) -> Dict[str, Any]:
-    return {
-        "id": id,
-        "name": participant.name,
-        "portfolio": view_portfolio(participant.portfolio),
-        "open": participant.open,
-        "bid_price": participant.bid_price,
-        "ask_price": participant.ask_price
-    }
-
-def view_participants(market: Market):
-    participants_list = []
-    for p_id, participant in market.participants.items():
-        participants_list.append(view_participant(p_id, participant))
-    return participants_list
+def emit_market_view(market_id, market):
+    def inner():
+        socketio.emit(f"market_update_{market_id}", view_market(market_id, market))
+    return inner
 
 @app.route("/ping")
 def ping():
@@ -76,7 +53,7 @@ def ping():
 
 @app.route("/")
 def index():
-    return render_template("index.html",  markets=view_markets())
+    return render_template("index.html",  markets=view_markets(MARKETS))
 
 @app.route("/login", methods=["POST"])
 @cross_origin()
@@ -105,28 +82,34 @@ def get_login():
 
 @app.route("/markets/new", methods=["POST"])
 @cross_origin()
-@check_json_values(name=str)
+@check_json_values(name=str, bots=int)
 def new_market():
     name = request.checked_json["name"]
     if not name.isalnum():
         return jsonify(error("Market name must be alphanumeric without space"))
-    if name in markets:
+    if name in MARKETS:
         return jsonify(error("Market name already taken"))
-    markets[name] = Market()
-    markets[name].start()
+    market = Market()
+    market.start()
+    market.add_watch(emit_market_view(name, market))
+    MARKETS[name] = market
+    n_bots = max(0, min(10, request.checked_json["bots"]))
+    for name in BOT_NAMES[:n_bots]:
+        bot = Bot(name, market)
+        bot.start()
     return jsonify({"market_id": name})
 
 @app.route("/markets", methods=["GET"])
 @cross_origin()
 def get_markets():
-    return jsonify(view_markets())
+    return jsonify(view_markets(MARKETS))
 
 @app.route("/market/<market_id>")
 @cross_origin()
 @check_logged_in
 @check_market
 def market_view(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     market_view = view_market(market_id, market)
     user_id = session["user_id"]
     market_view["joined"] = user_id in market.participants
@@ -140,7 +123,7 @@ def market_view(market_id):
 @check_logged_in
 def join_market(market_id):
     user_id = session["user_id"]
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     if user_id in market.participants:
         return jsonify(error(f"User already in market, can only join once"))
     hidden_value = market.join_market(user_id)
@@ -154,7 +137,7 @@ def join_market(market_id):
 @app.route("/market/<market_id>/books", methods=["GET"])
 @check_market
 def market_books(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     return jsonify(view_books(market))
 
 @app.route("/market/<market_id>/order/post/buy", methods=["POST"])
@@ -163,7 +146,7 @@ def market_books(market_id):
 @check_participant
 @check_json_values(quantity=int, price=float)
 def post_order_buy(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     market.post_order(user_id, Sides.BUY, request.checked_json["quantity"], request.checked_json["price"])
     return jsonify({})
@@ -174,7 +157,7 @@ def post_order_buy(market_id):
 @check_participant
 @check_json_values(quantity=int, price=float)
 def post_order_sell(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     market.post_order(user_id, Sides.SELL, request.checked_json["quantity"], request.checked_json["price"])
     return jsonify({})
@@ -185,7 +168,7 @@ def post_order_sell(market_id):
 @check_participant
 @check_json_values(quantity=int, price=float)
 def take_order_buy(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     side, quantity, price = Sides.BUY, request.checked_json["quantity"], request.checked_json["price"]
     filled = market.take_order(user_id, side, quantity, price)
@@ -199,7 +182,7 @@ def take_order_buy(market_id):
 @check_participant
 @check_json_values(quantity=int, price=float)
 def take_order_sell(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     side, quantity, price = Sides.SELL, request.checked_json["quantity"], request.checked_json["price"]
     filled = market.take_order(user_id, side, quantity, price)
@@ -213,7 +196,7 @@ def take_order_sell(market_id):
 @check_logged_in
 @check_participant
 def get_portfolio(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     portfolio = market.participants[user_id].portfolio
     return jsonify({
@@ -227,7 +210,7 @@ def get_portfolio(market_id):
 @check_participant
 @check_json_values(is_open=bool, sell_price=float, buy_price=float)
 def set_prices(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     market.set_price(user_id, Sides.BUY, request.checked_json["buy_price"])
     market.set_price(user_id, Sides.SELL, request.checked_json["sell_price"])
@@ -244,7 +227,7 @@ def set_prices(market_id):
 def set_price(market_id, side):
     if side not in ("buy", "sell"):
         return jsonify(error("side must be 'buy' or 'sell'"))
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     market.set_price(user_id, Sides.BUY if side=="buy" else Sides.SELL, request.checked_json["price"])
     return jsonify({
@@ -257,7 +240,7 @@ def set_price(market_id, side):
 @check_participant
 @check_json_values(open=bool)
 def set_open(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     participant = market.participants[user_id]
     open_ = request.checked_json["open"]
@@ -274,7 +257,7 @@ def set_open(market_id):
 @check_participant
 @check_json_values(counterparty_id = str, price = float, side = bool)
 def take_offer(market_id):
-    market = markets.get(market_id)
+    market = MARKETS.get(market_id)
     user_id = session["user_id"]
     participant = market.participants[user_id]
     if not participant.open:
@@ -294,6 +277,9 @@ def take_offer(market_id):
     return jsonify({
         "status": "success"
     })
+
+# init_markets(MARKETS)
+# init_with_bots(MARKETS)
 
 if __name__ == "__main__":
     app.run(port=4000, debug=True)

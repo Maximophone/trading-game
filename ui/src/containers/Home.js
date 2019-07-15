@@ -15,17 +15,13 @@ export default class Home extends Component {
   }
 
   async componentDidMount() {
-    console.log("Calling component did mount of home");
-    if (!this.props.is_logged_in){
-      return;
-    }
-    console.log("passed the is logged in check");
-
     get("markets", (markets) => {
-      this.setState({ markets });
+      this.setState({ 
+        markets: markets,
+        is_loading: false
+      });
     }, (error) => {
       alert(error);
-    }).finally(() => {
       this.setState({is_loading: false});
     });
   }
@@ -39,7 +35,7 @@ export default class Home extends Component {
               to={`/market/${market.id}`}
               >
                 <ListGroupItem header={market.id}>
-                  {market.open?"Open":"Closed"}
+                  {market.is_open?"Open":"Closed"}
                 </ListGroupItem>
               </LinkContainer>
           : <LinkContainer
@@ -58,7 +54,7 @@ export default class Home extends Component {
 
   render_lander(){
     return (
-      <div className="Lander">
+      <div className="lander">
         <h1>Traders</h1>
         <p>A Trading Card Game</p>
       </div>

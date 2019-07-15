@@ -1,5 +1,5 @@
 from flask import session, request, jsonify
-from traders.market import markets
+from traders.app import MARKETS
 import json
 
 
@@ -49,7 +49,7 @@ def check_params(*param_types):
 
 def check_market(f):
     def inner(market_id, *args, **kwargs):
-        if market_id not in markets:
+        if market_id not in MARKETS:
             return jsonify(error(f"Can't find market with id {market_id}"))
         return f(market_id, *args, **kwargs)
     inner.__name__ = f.__name__
@@ -57,7 +57,7 @@ def check_market(f):
 
 def check_participant(f):
     def inner(market_id, *args, **kwargs):
-        market = markets.get(market_id)
+        market = MARKETS.get(market_id)
         user_id = session["user_id"]
         if user_id not in market.participants:
             return jsonify(error(f"User needs to join market first"))

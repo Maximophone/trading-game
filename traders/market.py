@@ -1,11 +1,12 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+
 from typing import NamedTuple, Dict, List, Tuple
 import random
 from threading import Thread
 import time
 
-CLOSING_TIME = 60 * 5 - 1
 UPDATE_FREQUENCY = 60
+CLOSING_TIME = UPDATE_FREQUENCY * 5 - 1
 
 class Portfolio:
     def __init__(self):
@@ -44,6 +45,14 @@ class Order:
     participant_id: str
     filled: int = 0
 
+def watch(f):
+    def inner(self, *args, **kwargs):
+        ret = f(self, *args, **kwargs)
+        for callback in self.watch_callbacks:
+            callback()
+        return ret
+    return inner
+
 class Market(Thread):
     def __init__(self):
         self.open = True
@@ -57,18 +66,20 @@ class Market(Thread):
         self.participants: Dict[id, Participant] = {}
         self.buy_book: Dict[float, List[Order]] = {}
         self.sell_book: Dict[float, List[Order]] = {}
+        self.watch_callbacks = []
         super().__init__()
 
-    def run(self):
-        # First phase, waiting for traders arrival
+    def run(self): 
         while(self.open):
             time.sleep(1)
             self.timer += 1
             if self.timer % self.update_frequency == 0:
                 self.values.append(self.pick_new_value())
+                print("Updating market")
             if self.timer >= self.closing_time:
                 self.liquidate()
-                self.open=False
+                self.open = False
+                print("Closing market")
 
     def pick_new_value(self) -> int:
         return random.randint(1, 100)
@@ -76,11 +87,15 @@ class Market(Thread):
     @staticmethod
     def gen_token() -> str:
         return f"{random.getrandbits(32):x}"
+    
+    def add_watch(self, callback):
+        self.watch_callbacks.append(callback)
 
+    @watch
     def liquidate(self):
-        all_values = self.values + [p.hidden_value for p in self.participants]
+        all_values = self.values + [p.hidden_value for p in self.participants.values()]
         self.final_value = sum(all_values)/len(all_values)
-        for participant in self.participants:
+        for participant in self.participants.values():
             portfolio = participant.portfolio
             portfolio.capital += portfolio.assets * self.final_value
             portfolio.assets = 0
@@ -89,6 +104,7 @@ class Market(Thread):
         assert token in self.token_id
         return self.token_id[token]
 
+    @watch
     def join_market(self, user_id: str) -> int:
         assert user_id not in self.participants
         hidden_value: int = self.pick_new_value()
@@ -135,6 +151,7 @@ class Market(Thread):
         if side==Sides.SELL:
             return self.sell_book
 
+    @watch
     def take_price(self, user_id: str, counterparty_id: str, side: bool, price: float) -> bool:
         assert user_id in self.participants
         assert counterparty_id in self.participants
@@ -157,6 +174,7 @@ class Market(Thread):
             counterparty.portfolio.sell_assets(1, price)
         return True
 
+    @watch
     def set_price(self, user_id: str, side: bool, price: float):
         assert user_id in self.participants
         assert price >= 0
@@ -166,6 +184,7 @@ class Market(Thread):
         else:
             participant.ask_price = price
 
+    @watch
     def set_open(self, user_id: str, is_open: bool):
         assert user_id in self.participants
         participant = self.participants[user_id]
@@ -180,6 +199,7 @@ def clear_markets(markets):
         del market
 
 def init_markets(markets):
+    from traders.app import emit_market_view
     clear_markets(markets)
     market_test = Market()
     market_test.join_market("max")
@@ -196,6 +216,19 @@ def init_markets(markets):
     market_test.post_order("bob", True, 20, 10)
     markets["Market1"] = market_test
     market_test.start()
+    market_test.add_watch(emit_market_view("Market1", market_test))
 
-markets: Dict[str, Market] = {}
-init_markets(markets)
+def init_with_bots(markets):
+    from traders.app import emit_market_view
+    from traders.bots import Bot
+    clear_markets(markets)
+    market_with_bots = Market()
+    bot_names = ["bob", "will", "dawn", "jerry"]
+    bots = []
+    for name in bot_names:
+        bots.append(Bot(name, market_with_bots))
+    markets["BotLand"] = market_with_bots
+    market_with_bots.start()
+    market_with_bots.add_watch(emit_market_view("BotLand", market_with_bots))
+    for bot in bots:
+        bot.start()

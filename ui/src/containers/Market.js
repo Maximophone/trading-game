@@ -1,7 +1,9 @@
 import React, { Component } from "react";
 import { PageHeader, ListGroup, ListGroupItem, Panel, Form, Checkbox, FormGroup, ControlLabel, FormControl} from "react-bootstrap"
 import LoaderButton from "../components/LoaderButton";
-import { get, post, is_float } from "../utils";
+import Slider from '@material-ui/core/Slider';
+import {VictoryChart, VictoryScatter, VictoryTheme} from "victory"
+import { get, post, is_float, Sides } from "../utils";
 import "./Market.css"
 
 
@@ -17,7 +19,9 @@ export default class Market extends Component {
             is_joining: false,
             market_values: [],
             hidden_value: null,
+            final_value: null,
             portfolio: null,
+            participant: null,
             is_setting: false,
             open: null,
             price_setting: {
@@ -29,11 +33,11 @@ export default class Market extends Component {
     }
 
     async componentDidMount(){
-        console.log("mounted")
         this.refresh();
+
     }
 
-    refresh(){
+    refresh = () => {
         get(`market/${this.props.match.params.id}`, (data) => {
             if("error" in data){
                 alert(data.error);
@@ -41,10 +45,12 @@ export default class Market extends Component {
                 this.setState({
                     name: data.name,
                     participants: data.participants,
+                    participant: data.participants.filter(p => p.id == this.props.user_name)[0],
                     books: data.books,
                     joined: data.joined,
                     market_values: data.market_values,
                     hidden_value: data.hidden_value,
+                    final_value: data.final_value,
                     open: data.open,
                 });
                 if(data.joined){
@@ -53,6 +59,19 @@ export default class Market extends Component {
             }
         }, (error) => {
             alert(error);
+        });
+    }
+
+    refresh_from_public_data = (data) => {
+        var participant = data.participants.filter(p => p.id == this.props.user_name)[0];
+        this.setState({
+            name: data.name,
+            participants: data.participants,
+            books: data.books,
+            market_values: data.market_values,
+            open: data.open,
+            participant: participant,
+            portfolio: participant.portfolio,
         });
     }
 
@@ -70,27 +89,6 @@ export default class Market extends Component {
         });
     }
 
-    render_participant_item(participant){
-        if(participant.open){
-            return (
-                `Open to offers: BID=${participant.bid_price} ASK=${participant.ask_price}`
-            )
-        } else {
-            return (
-                `Closed to offers.`
-            )
-        };
-    }
-
-    render_participants_list(participants){
-        return participants.map(
-            (participant, i) => 
-                <ListGroupItem header={participant.name} key={i}>
-                    { this.render_participant_item(participant) }
-                </ListGroupItem>
-        );
-    }
-
     handleJoin = async event => {
         event.preventDefault();
         this.setState({is_joining: true})
@@ -103,9 +101,13 @@ export default class Market extends Component {
                     joined: true,
                     market_values: data.market_values,
                     hidden_value: data.hidden_value,
-                    participants: data.participants
+                    participants: data.participants,
+                    participant: data.participants.filter(p => p.id == this.props.user_name)[0],
                 });
                 this.getPortfolio();
+                this.props.socket.on("market_update_" + this.state.name, (data) => {
+                    this.refresh_from_public_data(data);
+                });
             }
         }, (error) => {
             alert(error);
@@ -165,33 +167,136 @@ export default class Market extends Component {
         });
     }
 
+    handleSetPriceChangeSlider = (event, new_value) => {
+        console.log(new_value);
+        var price_setting = this.state.price_setting
+        price_setting.buy_price = new_value[0] || 0
+        price_setting.sell_price = new_value[1] || 0
+        this.setState({
+            price_setting: price_setting
+        });
+    }
+
     validatePrices(){
         var sell_price = this.state.price_setting.sell_price;
         var buy_price = this.state.price_setting.buy_price;
         return is_float(sell_price) && is_float(buy_price) && sell_price >= 0 && buy_price >= 0 && sell_price >= buy_price;
     }
 
+    canTakePrices(){
+        // TODO: check if participant is open as well
+        return this.state.open;
+    }
+
+    handleTakePrice = event => {
+        event.preventDefault();
+        post(`market/${this.props.match.params.id}/offers/take`, {
+            counterparty_id: event.target.attributes.counterparty_id.value,
+            price: event.target.attributes.price.value,
+            side: event.target.attributes.side.value == "buy" ? Sides.BUY : Sides.SELL,
+        }, (data) => {
+            if("error" in data){
+                alert(data.error);
+            }
+            this.refresh();
+        }, (error) => {
+            alert(error);
+        });
+    }
+
+    render_participant_item(participant){
+        if(this.state.open){
+            if(participant.open){
+                return (
+                    <Form inline>
+                        <p>Open to offers:
+                        <FormGroup controlId="take_buy">
+                            <ControlLabel>BID = ${participant.bid_price} </ControlLabel>
+                            <LoaderButton 
+                                inline
+                                bsSize="small"
+                                type="submit"
+                                disabled={!this.canTakePrices()}
+                                is_loading={false}
+                                text="Sell"
+                                loading_text="Selling..."
+                                onClick={this.handleTakePrice}
+                                counterparty_id={participant.id}
+                                side="buy"
+                                price={participant.bid_price}
+                                />
+                        </FormGroup>
+                        <FormGroup controlId="take_sell">
+                            <ControlLabel>ASK = ${participant.ask_price} </ControlLabel>
+                            <LoaderButton 
+                                inline
+                                bsSize="small"
+                                type="submit"
+                                disabled={!this.canTakePrices()}
+                                is_loading={false}
+                                text="Buy"
+                                loading_text="Buying..."
+                                onClick={this.handleTakePrice}
+                                counterparty_id={participant.id}
+                                side="sell"
+                                price={participant.ask_price}
+                                />
+                        </FormGroup>
+                        </p>
+                        </Form>
+                )
+            } else {
+                return (
+                    <p>Closed to offers.</p>
+                )
+            };
+        } else {
+            return (
+                <p>Final Profits: ${participant.portfolio.capital}</p>
+            )
+        }
+    }
+
+    render_participants_list(participants){
+        return participants.map(
+            (participant, i) => 
+                <ListGroupItem header={participant.name} key={i}>
+                    { this.render_participant_item(participant) }
+                </ListGroupItem>
+        );
+    }
+
     render_set_prices(){
-        if(!this.state.joined){
+        if(!this.state.joined || !this.state.open){
             return;
         }
         return (
             <div className="price_setting">
                 <Form inline onSubmit={this.handleSetPrices}>
-                    <FormGroup controlId="sell_price">
-                        <ControlLabel>Sell Price</ControlLabel>
-                        <FormControl
-                            onChange={this.handleSetPriceChange}
-                            value={this.state.price_setting.sell_price}
-                            componentClass="input"
-                        />
-                    </FormGroup>
-                    {"  "}
+                    <Slider
+                        value={[this.state.price_setting.buy_price, this.state.price_setting.sell_price]}
+                        onChange={this.handleSetPriceChangeSlider}
+                        valueLabelDisplay="auto"
+                        aria-labelledby="range-slider"
+                        marks={[
+                            {value: this.state.participant.bid_price, label: "buy"},
+                            {value: this.state.participant.ask_price, label: "sell"}
+                        ]}
+                    />
                     <FormGroup controlId="buy_price">
                         <ControlLabel>Buy Price</ControlLabel>
                         <FormControl
                             onChange={this.handleSetPriceChange}
                             value={this.state.price_setting.buy_price}
+                            componentClass="input"
+                        />
+                    </FormGroup>
+                    {"  "}
+                    <FormGroup controlId="sell_price">
+                        <ControlLabel>Sell Price</ControlLabel>
+                        <FormControl
+                            onChange={this.handleSetPriceChange}
+                            value={this.state.price_setting.sell_price}
                             componentClass="input"
                         />
                     </FormGroup>
@@ -243,8 +348,25 @@ export default class Market extends Component {
                         </ListGroup>
                     </Panel>
                 </div>
+                {this.render_final_value()}
             </div>
         );
+    }
+
+    render_final_value(){
+        if(this.state.open){
+            return;
+        }
+        return (
+            <div className="final_value">
+                <Panel>
+                    <ListGroup variant="flush">
+                        <ListGroupItem key="title"><h4>Final Value</h4></ListGroupItem>
+                        <ListGroupItem key="value"><b>{this.state.final_value}</b></ListGroupItem>
+                    </ListGroup>
+                </Panel>
+            </div>
+        )
     }
 
     render_portfolio(){
@@ -267,9 +389,44 @@ export default class Market extends Component {
         )
     }
 
+    render_history(){
+        if(!this.state.joined){
+            return;
+        }
+/*         return (
+            <VictoryChart
+                theme={VictoryTheme.material}
+                height={150}
+                domain={{ x: [0, 5], y: [0, 100] }}
+                >
+                <VictoryScatter
+                    style={{ data: { fill: "#c43a31" } }}
+                    size={1}
+                    data={[
+                    { x: 1, y: 2 },
+                    { x: 2, y: 3 },
+                    { x: 3, y: 5 },
+                    { x: 4, y: 4 }, 
+                    { x: 5, y: 7 }
+                    ]}
+                />
+                </VictoryChart>
+        ) */
+    }
+
     render(){
         return <div className="Market">
-            <PageHeader>{this.state.name}</PageHeader>
+            <PageHeader>{this.state.name} - {this.state.open ? "Open" : "Closed"} <LoaderButton 
+                                inline
+                                bsSize="small"
+                                type="submit"
+                                disabled={!this.state.open}
+                                is_loading={false}
+                                text="Refresh"
+                                loading_text="Refreshing..."
+                                onClick={this.refresh}
+                                /></PageHeader>
+            { this.render_history() }
             <h3>Participants</h3>
             <ListGroup>
                 { this.render_participants_list(this.state.participants)}

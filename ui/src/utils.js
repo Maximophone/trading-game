@@ -1,4 +1,5 @@
-import { API_ADDRESS } from "./config.js"
+import { API_ADDRESS } from "./config.js";
+import openSocket from "socket.io-client";
 
 function request(method, url, data, success, error){
     var fetch_data
@@ -30,6 +31,21 @@ export function get(url, success, error){
     return request("GET", url, null, success, error);
 }
 
+export function get_socket(){
+    var socket = openSocket(API_ADDRESS);
+    socket.on("connect", function(){
+      socket.emit("connection", {data: "connected"}, function(sid){
+        console.log(sid);
+      });
+    });
+    return socket;
+}
+
 export function is_float(x){
     return !isNaN(x) && !(x == null)
+}
+
+export var Sides = {
+    BUY: true,
+    SELL: false,
 }

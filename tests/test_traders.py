@@ -1,8 +1,10 @@
 from traders import __version__
-from traders.app import app, USERS
-from traders.market import markets, init_markets, Sides
+from traders.app import app, USERS, MARKETS
+from traders.market import init_markets, Sides
 
 import pytest
+
+init_markets(MARKETS)
 
 @pytest.fixture(autouse=True)
 def clear_users():
@@ -10,7 +12,7 @@ def clear_users():
 
 @pytest.fixture(autouse=True)
 def restart_markets():
-    init_markets(markets)
+    init_markets(MARKETS)
 
 @pytest.fixture
 def client():
@@ -23,7 +25,7 @@ def stop_markets():
     # Will be executed before the first test
     yield None
     # Will be executed after the last test
-    for market in markets.values():
+    for market in MARKETS.values():
         market.open = False
 
 def get_200(client, req, *args, ip=None, **kwargs):
@@ -51,7 +53,7 @@ def test_ping(client):
     assert rv.status=="200 OK"
     assert rv.data.decode() == "pong"
 
-initial_market = {"id": list(markets.keys())[0], "is_open":True}
+initial_market = {"id": list(MARKETS.keys())[0], "is_open":True}
 
 def test_get_markets(client):
     rv = client.get("/markets")
@@ -59,7 +61,7 @@ def test_get_markets(client):
     assert rv.get_json() == [initial_market]
 
 def test_new_market(client):
-    rv = client.post("/markets/new", json=dict(name="2"))
+    rv = client.post("/markets/new", json=dict(name="2", bots=0))
     assert rv.status_code == 200
     assert rv.get_json() == {"market_id": "2"}
     rv = client.get("/markets")
@@ -111,7 +113,7 @@ def test_market_view(client):
     assert price_level_10[0] == {"filled": 0, "participant_id": "max", "price": 10, "quantity": 100, "side": True}
 
 def test_scenario(client):
-    post_200(client, "/markets/new", json=dict(name="2"))
+    post_200(client, "/markets/new", json=dict(name="2", bots=0))
     
     # Max logs in
     login_resp = post_200(client, "/login", json={"name": "max"})
@@ -208,7 +210,7 @@ def portfolio_test(client, market_id, expected_assets, expected_capital):
     assert portfolio == {"assets": expected_assets, "capital": expected_capital}
 
 def test_taking_price(client):
-    post_200(client, "/markets/new", json=dict(name="2"))
+    post_200(client, "/markets/new", json=dict(name="2", bots=0))
     
     # Max logs in
     login_test("max", client)
@@ -244,7 +246,7 @@ def test_taking_price(client):
     # Bob opens his offers
     open_resp = post_200(client_bob, "market/2/offers/set_open", json={"open": True})
     assert open_resp == {"status": "success"}
-    assert markets["2"].participants["bob"].open
+    assert MARKETS["2"].participants["bob"].open
 
     # Bob takes Max's sell price
     take_sell_resp = post_200(client_bob, "market/2/offers/take", json={"counterparty_id": "max", "price": 12, "side": Sides.SELL})
