@@ -52,10 +52,6 @@ def emit_market_view(market_id, market):
 def ping():
     return "pong"
 
-@app.route("/")
-def index():
-    return render_template("index.html",  markets=view_markets(MARKETS))
-
 @app.route("/login", methods=["POST"])
 @cross_origin()
 @check_json_values(name=str)
