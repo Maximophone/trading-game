@@ -5,7 +5,7 @@ run:
 	cd traders && poetry run flask run
 
 run_prod:
-	cd traders && sudo `which poetry` run flask run --host=0.0.0.0 --port=5001
+	cd traders && poetry run flask run --host=0.0.0.0 --port=5001
 
 run80:
 	cd traders && sudo poetry run flask run --port=80
