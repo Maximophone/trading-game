@@ -79,14 +79,16 @@ def get_login():
 
 @app.route("/markets/new", methods=["POST"])
 @cross_origin()
-@check_json_values(name=str, bots=int)
+@check_json_values(name=str, bots=int, n_periods=int, period_time=int)
 def new_market():
     name = request.checked_json["name"]
+    n_periods = request.checked_json["n_periods"]
+    period_time = request.checked_json["period_time"]
     if not name.isalnum():
         return jsonify(error("Market name must be alphanumeric without space"))
     if name in MARKETS:
         return jsonify(error("Market name already taken"))
-    market = Market()
+    market = Market(n_periods=n_periods, time_per_period=period_time)
     market.start()
     market.add_watch(emit_market_view(name, market))
     MARKETS[name] = market

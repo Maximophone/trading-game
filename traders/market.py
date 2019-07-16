@@ -54,11 +54,11 @@ def watch(f):
     return inner
 
 class Market(Thread):
-    def __init__(self):
+    def __init__(self, n_periods=5, time_per_period=60):
         self.open = True
         self.timer = 0
-        self.closing_time = CLOSING_TIME
-        self.update_frequency = UPDATE_FREQUENCY
+        self.closing_time = n_periods * time_per_period - 1
+        self.update_frequency = time_per_period
         self.values = [self.pick_new_value()]
         self.final_value = None
         self.ip_tokens: Dict[str, str] = {}
@@ -77,8 +77,8 @@ class Market(Thread):
                 self.values.append(self.pick_new_value())
                 print("Updating market")
             if self.timer >= self.closing_time:
-                self.liquidate()
                 self.open = False
+                self.liquidate()
                 print("Closing market")
 
     def pick_new_value(self) -> int:

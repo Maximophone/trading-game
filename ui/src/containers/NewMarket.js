@@ -12,12 +12,14 @@ export default class NewMarket extends Component {
         this.state = {
             is_loading: null,
             market_name: "",
+            n_periods: 5,
+            period_time: 60,
             bots: 0,
         };
     }
 
     validateForm(){
-        return this.state.market_name.length > 0;
+        return this.state.market_name.length > 0 && this.state.n_periods > 0 && this.state.period_time > 1 && this.state.n_periods*this.state.period_time < 3600;
     }
 
     handleChange = event => {
@@ -38,6 +40,8 @@ export default class NewMarket extends Component {
         post("markets/new", {
             name: this.state.market_name,
             bots: this.state.bots,
+            n_periods: this.state.n_periods,
+            period_time: this.state.period_time,
         }, (data) => {
             if("error" in data){
                 alert(data.error);
@@ -60,7 +64,26 @@ export default class NewMarket extends Component {
                         <FormControl
                             onChange={this.handleChange}
                             value={this.state.market_name}
-                            componentClass="textarea"
+                            componentClass="input"
+                            type="text"
+                        />
+                    </FormGroup>
+                    <FormGroup controlId="n_periods">
+                        <ControlLabel>Number of Stages</ControlLabel>
+                        <FormControl
+                            onChange={this.handleChange}
+                            value={this.state.n_periods}
+                            componentClass="input"
+                            type="number"
+                        />
+                    </FormGroup>
+                    <FormGroup controlId="period_time">
+                        <ControlLabel>Time per Stage</ControlLabel>
+                        <FormControl
+                            onChange={this.handleChange}
+                            value={this.state.period_time}
+                            componentClass="input"
+                            type="number"
                         />
                     </FormGroup>
                     <FormGroup controlId="bots">
