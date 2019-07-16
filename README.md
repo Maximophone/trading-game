@@ -1,6 +1,9 @@
 # Trading Game
 
 A simple card game. Each player is given a hidden value from 1 to 100 and the market has an expanding list of public values. Players trade between each other for what they think is the average value.
+Very beta...
+
+**Play the game [here](http://35.197.192.156:5000/) !**
 
 ## Running the server
 
