@@ -24,3 +24,6 @@ build_ui:
 
 serve_ui:
 	cd ui && serve -s build
+
+run_ui:
+	cd ui && npm start
